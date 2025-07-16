@@ -9,10 +9,13 @@ interface VolumeRating {
 }
 
 interface VolumeData {
-  [time: string]: string;
+  [time: string]: string | VolumeRating | undefined;
   rating?: VolumeRating;
 }
 
+interface MarketFlowChartProps {
+  date: Date;
+}
 
 function hexToRgba(hex: string = "#cccccc", alpha: number = 1) {
   const clean = (hex || "").trim().replace(/^#/, "");
@@ -415,7 +418,7 @@ const MarketFlowChart = ({ date }: MarketFlowChartProps) => {
       const y = (getY(timeStr) / 100) * height;
       const text = volumeData[timeStr];
       if (text) {
-        text.split("\n").forEach((line, i) => {
+        String(text).split("\n").forEach((line, i) => {
           ctx.fillStyle = "#000";
           ctx.fillText(line, width - 60, y + (i - 0.5) * 12);
         });
@@ -429,7 +432,7 @@ const MarketFlowChart = ({ date }: MarketFlowChartProps) => {
       const sectors = timeSectorMap[timeStr] || [];
 
       sectors.forEach((sector, idx) => {
-        const style = sectorStyles[sector] || { emoji: "❓", color: "#ccc" };
+        const style = sectorStyles[sector as keyof typeof sectorStyles] || { emoji: "❓", color: "#ccc" };
         const label = `${style.emoji} ${sector}`;
 
         const offsetY = y + idx * 20; // ✅ 여기 선언 필요
@@ -452,7 +455,8 @@ const MarketFlowChart = ({ date }: MarketFlowChartProps) => {
       const x = (item.xRatio / 100) * width;
       const y = (item.yRatio / 100) * height;
 
-      const style = sectorStyles[item.섹터] || { color: "#ccc" };
+      const style = sectorStyles[item.섹터 as keyof typeof sectorStyles] || { color: "#ccc" };
+
       const hexColor = style.color;
       const textColor = "#000000";
       const label = item.종목명;
@@ -586,7 +590,9 @@ const MarketFlowChart = ({ date }: MarketFlowChartProps) => {
         {/* ✅ COMMENT 영역 */}
           <div className="mt-4 border rounded p-3 bg-gray-50">
             <div className="text-gray-800 font-bold mb-2">COMMENT</div>
-            <div className="text-gray-800 whitespace-pre-line text-sm">{volumeData.comment}</div>
+            <div className="text-gray-800 whitespace-pre-line text-sm">
+              {typeof volumeData.comment === "string" ? volumeData.comment : ""}
+            </div>
           </div>
       </div>
 

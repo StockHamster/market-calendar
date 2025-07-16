@@ -1,7 +1,9 @@
 // 섹터 색상 및 이모지 정의
 // 배경색이 진하면 텍스트는 흰색, 밝으면 검은색으로 조정됨
 
-export const sectorStyles = {
+export const sectorStyles: {
+  [key: string]: { emoji: string; color: string };
+} = {
   "섹터":         { emoji: "　", color: "#ffffff" },
   "2차전지":      { emoji: "🔋", color: "#71e046" },
   "5G":          { emoji: "📶", color: "#258441" },

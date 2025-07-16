@@ -10,7 +10,7 @@ import MarketFlowChart from "@/app/MarketFlowChart"
 import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase"; // 위에서 만든 파일
 
-const HOLIDAYS = {
+const HOLIDAYS: { [key: string]: string } = {
   "2025-06-03": "대통령 선거일",
   "2025-06-06": "현충일",
   "2025-08-15": "광복절",
@@ -43,49 +43,113 @@ const TAGS = {
   ]
 };
 
+interface Note {
+  text: string;
+  tag: string;
+}
+type SimpleTag = {
+  label: string;
+  color: string;
+};
+
+type PrefixTag = {
+  label: string;
+  textColor: string;
+  bgColor: string;
+  prefix: string;
+  color?: string;
+};
+
+type TagInfo = SimpleTag | PrefixTag;
+
+type DragSource = {
+  key: string;
+  index: number;
+};
+
+type SectorInfo = {
+  섹터: string;
+  이모지: string;
+};
+
+function hasPrefixField(obj: any): obj is { prefix: string } {
+  return obj && typeof obj.prefix === "string";
+}
+function hasPrefixInfo(tag: any): tag is { prefix: string; bgColor: string; textColor: string } {
+  return tag && typeof tag.prefix === "string" && typeof tag.bgColor === "string" && typeof tag.textColor === "string";
+}
+function isPrefixTag(tag: TagInfo): tag is PrefixTag {
+  return (
+    typeof tag === "object" &&
+    tag !== null &&
+    "prefix" in tag &&
+    typeof tag.prefix === "string" &&
+    typeof tag.bgColor === "string" &&
+    typeof tag.textColor === "string"
+  );
+}
+function hasPrefixFields(tag: TagInfo): tag is TagInfo & {
+  textColor: string;
+  bgColor: string;
+  prefix: string;
+} {
+  return (
+    typeof tag === "object" &&
+    tag !== null &&
+    "prefix" in tag &&
+    typeof (tag as any).prefix === "string" &&
+    typeof (tag as any).bgColor === "string" &&
+    typeof (tag as any).textColor === "string"
+  );
+}
+
 export default function MarketCalendarApp() {
-  const [selectedMarketFlowDate, setSelectedMarketFlowDate] = useState(null);
-  const [calendarView, setCalendarView] = useState("schedule");
+  const [selectedMarketFlowDate, setSelectedMarketFlowDate] = useState<Date | null>(null);
+  const [calendarView, setCalendarView] = useState<"schedule" | "record">("schedule");
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [notes, setNotes] = useState({});
+  type Notes = {
+    [dayKey: string]: Note[];
+  };
+  const [notes, setNotes] = useState<Notes>({});
   const [tags, setTags] = useState({});
   const [currentMonth, setCurrentMonth] = useState(new Date());
   // const [newNote, setNewNote] = useState("");
   {/*const [selectedTag, setSelectedTag] = useState(
     calendarView === "schedule" ? TAGS.schedule[0].label : TAGS.record[0].label
   );*/}
-  const [hoveredNote, setHoveredNote] = useState(null);
-  const [modalDate, setModalDate] = useState(null);
-  const [dragSource, setDragSource] = useState(null);
-  const [monthlySector, setMonthlySector] = useState({});
-  const [top10Sectors, setTop10Sectors] = useState([]);
+  const [hoveredNote, setHoveredNote] = useState<string | null>(null);
+  const [modalDate, setModalDate] = useState<Date | null>(null);
+  const [dragSource, setDragSource] = React.useState<DragSource | null>(null);
+  const [monthlySector, setMonthlySector] = useState<Record<string, string[]>>({});
+  const [top10Sectors, setTop10Sectors] = useState<SectorInfo[]>([]);
   const [selectedSector, setSelectedSector] = useState("");
   const [todayVisitCount, setTodayVisitCount] = useState(0);
 
-  const isWeekend = (date) => {
-      const day = date.getDay();
-      return day === 0 || day === 6;
-    };
+  const isWeekend = (date: Date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  };
 
-    const isHoliday = (date) => {
+
+    const isHoliday = (date: Date) => {
       const isoKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      return HOLIDAYS[isoKey];
+      return (HOLIDAYS as Record<string, string>)[isoKey];
     };
 
-      const hexToRgba = (hex, alpha = 0.3) => {
+      const hexToRgba = (hex: string, alpha: number = 0.3) => {
         const r = parseInt(hex.slice(1, 3), 16)
         const g = parseInt(hex.slice(3, 5), 16)
         const b = parseInt(hex.slice(5, 7), 16)
         return `rgba(${r}, ${g}, ${b}, ${alpha})`
       }
         
-    const isFuture = (date) => {
+    const isFuture = (date: Date) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       return date > today;
     };
 
-    const getPreviousValidDate = (date) => {
+    const getPreviousValidDate = (date: Date) => {
       const newDate = new Date(date);
       do {
         newDate.setDate(newDate.getDate() - 1);
@@ -93,7 +157,7 @@ export default function MarketCalendarApp() {
       return newDate;
     };
 
-    const getNextValidDate = (date) => {
+    const getNextValidDate = (date: Date) => {
       const newDate = new Date(date);
       do {
         newDate.setDate(newDate.getDate() + 1);
@@ -102,7 +166,7 @@ export default function MarketCalendarApp() {
     };
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedMarketFlowDate) return;
 
       if (e.key === "ArrowLeft") {
@@ -117,7 +181,7 @@ export default function MarketCalendarApp() {
   }, [selectedMarketFlowDate]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedMarketFlowDate) return;
 
       if (e.key === "ArrowLeft") {
@@ -232,17 +296,21 @@ useEffect(() => {
     setNewNote("");
   };*/}
 
-  const handleDeleteNote = (dayKey, index) => {
+  const handleDeleteNote = (dayKey: string, index: number) => {
     const updated = [...notes[dayKey]];
     updated.splice(index, 1);
     setNotes({ ...notes, [dayKey]: updated });
   };
 
-  const handleEditNote = (dayKey, index, newText) => {
+  const handleEditNote = (dayKey: string, index: number, newText: string) => {
     const updated = [...notes[dayKey]];
-    updated[index].text = newText;
+    updated[index] = { 
+      ...updated[index],
+      text: newText
+    };
     setNotes({ ...notes, [dayKey]: updated });
   };
+
 
   const renderCalendar = () => {
     console.log("📅 현재 notes 키들:", Object.keys(notes));
@@ -264,7 +332,7 @@ useEffect(() => {
         const key = date.toDateString();
         const isoKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         const isHoliday = isCurrentMonth && HOLIDAYS[isoKey];
-        const compareDateOnly = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        const compareDateOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
         const isSameOrAfterJune30 = compareDateOnly(date) >= new Date(2025, 5, 30); // 5는 6월
         const isTodayOrBefore = compareDateOnly(date) <= compareDateOnly(new Date());
         
@@ -334,26 +402,26 @@ useEffect(() => {
 
             <div className="mt-10 text-xs text-left">
               {(notes[key] || []).map((note, idx) => {
-                const tagInfo = TAGS[calendarView].find((t) => t.label === note.tag) || {};
+                const tagInfo = TAGS[calendarView].find(t => t.label === note.tag);
                 const isEvent = note.tag === "이벤트";
                 const isOther = note.tag === "기타";
                 const isSpecialWarning = ["단기과열", "투자주의", "투자경고", "투자위험", "거래정지"].includes(note.tag);
-                const hasPrefix = tagInfo.prefix;
+                const hasPrefix = tagInfo && hasPrefixField(tagInfo);
 
                 const labelBadge = hasPrefix ? (
                   <span
                     className="inline-block mr-1 px-[4px] py-[1px] text-[11px] rounded-none"
                     style={{
-                      backgroundColor: tagInfo.bgColor,
-                      color: tagInfo.textColor,
+                      backgroundColor: tagInfo?.bgColor,
+                      color: tagInfo?.textColor,
                       fontWeight: "bold",
                     }}
                   >
-                    {tagInfo.prefix}
+                    {tagInfo?.prefix}
                   </span>
                 ) : null;
 
-                const shouldShowBackground = tagInfo.color && !tagInfo.prefix;
+                const shouldShowBackground = tagInfo?.color && !hasPrefix;
 
                 return (
                   <div
@@ -414,22 +482,22 @@ useEffect(() => {
     return weeks;
   };
 
-  const changeMonth = (offset) => {
+  const changeMonth = (offset: number) => {
     const newMonth = new Date(currentMonth);
     newMonth.setMonth(newMonth.getMonth() + offset);
     setCurrentMonth(newMonth);
   };
 
-  const handleDragStart = (dayKey, index) => {
+  const handleDragStart = (dayKey: string, index: number) => {
     console.log("dragStart:", dayKey, index);
     setDragSource({ key: dayKey, index });
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault(); // drop 허용
   };
 
-  const handleDrop = (dayKey, targetIndex) => {
+  const handleDrop = (dayKey: string, targetIndex: number) => {
     if (!dragSource) return;
 
     const sourceKey = dragSource.key;
@@ -489,7 +557,7 @@ useEffect(() => {
               })}
             </div>
             <div className="mt-4 text-right">
-              <Button size="sm" onClick={() => setModalDate(null)}>
+              <Button onClick={() => setModalDate(null)}>
                 닫기
               </Button>
             </div>
@@ -503,7 +571,8 @@ useEffect(() => {
             {/* ⬅️ 왼쪽: 태그들 */}
             <div className="text-sm space-x-2 flex flex-wrap">
               {TAGS[calendarView].map((tag) => {
-                const isSpecialTag = tag.textColor && tag.bgColor;
+                const isSpecialTag =
+                  "textColor" in tag && "bgColor" in tag && !!tag.textColor && !!tag.bgColor;
                 const isWhiteText = tag.label === "이벤트";
                 const isOther = tag.label === "기타";
 

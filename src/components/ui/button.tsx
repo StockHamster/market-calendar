@@ -1,13 +1,40 @@
-import * as React from "react";
+// @/components/ui/button.tsx
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
+import React from "react";
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {}
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md text-sm font-medium",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-white",
+        ghost: "bg-transparent hover:bg-gray-100",
+        // 추가 가능
+      },
+      size: {
+        sm: "h-8 px-3",
+        md: "h-10 px-4",
+        // 추가 가능
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "md",
+    },
+  }
+);
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, ...props }, ref) => {
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, ...props }, ref) => {
     return (
       <button
         ref={ref}
-        className={`bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 ${className}`}
+        className={cn(buttonVariants({ variant, size }), className)}
         {...props}
       />
     );
@@ -15,3 +42,5 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 Button.displayName = "Button";
+export { Button, buttonVariants };
+
